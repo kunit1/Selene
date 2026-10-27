@@ -17,6 +17,12 @@ namespace Selene
         private TimeSpan last;
         private bool on;
 
+        private static bool RenderEnabled()
+        {
+            var w = System.Windows.Application.Current != null ? System.Windows.Application.Current.MainWindow : null;
+            return w != null && w.IsVisible && w.WindowState != System.Windows.WindowState.Minimized && !CloseToTray.IsHidden;
+        }
+
         public StickScroll(ScrollViewer scroller, Func<bool> active) : this(() => scroller, active) { }
 
         public StickScroll(Func<ScrollViewer> target, Func<bool> active)
@@ -25,11 +31,12 @@ namespace Selene
             this.active = active;
         }
 
-        public void Start() { if (on) return; on = true; last = TimeSpan.Zero; velocity = 0; offset = -1; CompositionTarget.Rendering += Frame; }
+        public void Start() { if (on) return; on = true; last = TimeSpan.Zero; velocity = 0; offset = -1; if (RenderEnabled()) CompositionTarget.Rendering += Frame; }
         public void Stop() { if (!on) return; on = false; CompositionTarget.Rendering -= Frame; }
 
         private void Frame(object sender, EventArgs e)
         {
+            if (!RenderEnabled()) { last = TimeSpan.Zero; return; }
             var now = ((RenderingEventArgs)e).RenderingTime;
             if (now == last) return;   // (the same frame reported twice)
             double dt = last == TimeSpan.Zero ? 0 : Math.Min(0.05, (now - last).TotalSeconds);
