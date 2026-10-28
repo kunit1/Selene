@@ -31,6 +31,13 @@
 Playnite 10 or newer, Windows 10 / 11, a controller recommended. Everything Selene adds can be switched off in
 **Selene settings**. The **[guide](docs/guide/README.md)** has every screen and button.
 
+**Coming from 1.2.3, 1.3.0 or 1.3.1?** Update to 1.4.0, it removes the old admin helper. Then go to
+**Selene settings > Advanced > Old administrator tasks** to clean up what it left behind. Details in
+[#74](https://github.com/mattxslv/Selene/issues/74).
+
+Heads up: games running as admin can't be paused or closed from the Guide anymore. Alt+Tab still works.
+Downloads (trailers, art, songs) are off until you turn them on, and Selene tells you where they go first.
+
 ## In motion
 
 <table>
