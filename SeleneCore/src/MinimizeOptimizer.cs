@@ -8,13 +8,14 @@ using System.Windows.Media;
 
 namespace Selene
 {
-    // Minimizes GPU and VRAM usage to zero (or near-zero) whenever Playnite is minimized or hidden.
+    // Preserves the GPU/VRAM suspension and additionally releases reclaimable image/cache memory when Playnite is minimized or hidden.
     // 1. Shuts down active video decoders (LibraryStage trailers, tile previews, backdrop videos) to release DXVA GPU engines and buffers.
     // 2. Unhooks render loops (CompositionTarget.Rendering, full refresh rate, glide clocks, smoothness monitors).
     // 3. Collects and clears all active BitmapCache surfaces across the visual tree to free Direct3D textures from VRAM.
     // 4. Sets root visual to Hidden, causing WPF's milcore composition engine to enter complete idle state.
-    // 5. Calls native EmptyWorkingSet and GC to instruct Windows WDDM to evict unreferenced DirectX surfaces and staging buffers from local VRAM.
-    // 6. Seamlessly restores caches, refresh rates, and visuals on window restore with zero flicker.
+    // 5. Releases decoded screenshot, launch-art and wallpaper-preview cache references before collecting unreachable images.
+    // 6. Asks Windows to trim resident pages; committed/private bytes can remain allocated until reused or released by their owners.
+    // 7. Restores caches, refresh rates, and visuals on window restore.
     public static class MinimizeOptimizer
     {
         [DllImport("psapi.dll")]
@@ -77,12 +78,15 @@ namespace Selene
         {
             if (isMinimized) return;
             isMinimized = true;
-            HomeNav.Log("gpu-opt: window minimized/hidden -> suspending GPU/VRAM consumers");
+            HomeNav.Log("gpu-opt: window minimized/hidden -> pausing renderers and releasing image caches");
 
             try
             {
                 // 1. Stop all video playback immediately (DXVA hardware decoding shut down)
                 LibraryStage.Stop();
+                GameMedia.SuspendForMinimize();
+                HomeNav.ReleasePreloadedArt();
+                Wallpapers.ReleasePreloaded();
                 HomeNav.PauseForOverlay();
                 LoginScene.PauseVisuals(true);
                 IdleScreen.Restart();
@@ -116,7 +120,7 @@ namespace Selene
                     root.Visibility = Visibility.Hidden;
                 }
 
-                // 5. Force garbage collection and empty working set to trigger WDDM VRAM eviction
+                // 5. Collect image objects released above, then ask Windows to trim reclaimable resident pages.
                 GC.Collect(2, GCCollectionMode.Forced, true);
                 GC.WaitForPendingFinalizers();
                 GC.Collect(2, GCCollectionMode.Forced, true);
@@ -127,7 +131,7 @@ namespace Selene
                 }
                 catch { }
 
-                HomeNav.Log("gpu-opt: suspension complete (0% GPU, VRAM evicted)");
+                HomeNav.Log("gpu-opt: suspension complete (rendering paused, image caches released, working set trimmed)");
             }
             catch (Exception ex)
             {
@@ -171,6 +175,7 @@ namespace Selene
                 Smoothness.Resume();
                 Ui.FullRateChanged();
                 LoginScene.PauseVisuals(false);
+                GameMedia.ResumeAfterMinimize();
 
                 HomeNav.Log("gpu-opt: resume complete");
             }

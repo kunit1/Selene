@@ -6063,6 +6063,17 @@ namespace Selene
         // Play: the loading screen's hero art (4K jpg) and logo are decoded ahead, while the game is only selected
         private static readonly Dictionary<string, System.Windows.Media.Imaging.BitmapImage> coverArt = new Dictionary<string, System.Windows.Media.Imaging.BitmapImage>();
         private static readonly Queue<string> coverArtOrder = new Queue<string>();
+        private static int coverArtGeneration;
+
+        public static void ReleasePreloadedArt()
+        {
+            lock (coverArt)
+            {
+                coverArtGeneration++;
+                coverArt.Clear();
+                coverArtOrder.Clear();
+            }
+        }
 
         private static void CoverArtPaths(Guid gameId, out string bg, out string logo)
         {
@@ -6090,6 +6101,8 @@ namespace Selene
                 var jobs = new List<KeyValuePair<string, int>>();
                 if (bg != null) jobs.Add(new KeyValuePair<string, int>(bg, width));
                 if (logo != null) jobs.Add(new KeyValuePair<string, int>(logo, 0));
+                int generation;
+                lock (coverArt) generation = coverArtGeneration;
                 System.Threading.ThreadPool.QueueUserWorkItem(_ =>
                 {
                     foreach (var j in jobs)
@@ -6100,6 +6113,7 @@ namespace Selene
                         try { bmp = Decode(j.Key, j.Value); } catch { continue; }  // frozen: usable from the UI thread
                         lock (coverArt)
                         {
+                            if (generation != coverArtGeneration) continue;
                             if (coverArt.ContainsKey(key)) continue;
                             coverArt[key] = bmp;
                             coverArtOrder.Enqueue(key);

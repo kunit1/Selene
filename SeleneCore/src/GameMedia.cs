@@ -37,12 +37,14 @@ namespace Selene
         private static System.Collections.IList pendingNeighbours;
         private static Guid shown;
         private static int downloadGeneration;
+        private static bool suspended;
 
         public static void OnSelected(object game, System.Collections.IList neighbours)
         {
-            TrailerFetch.Want(game, neighbours);
             pending = game;
             pendingNeighbours = neighbours;
+            if (suspended) return;
+            TrailerFetch.Want(game, neighbours);
             if (debounce == null)
             {
                 Application.Current.Resources["SeleneShotsNone"] = Visibility.Collapsed;  // no "none" text before the first load
@@ -65,6 +67,7 @@ namespace Selene
         public static void ShowNow(object game)
         {
             OnSelected(game, null);
+            if (suspended) return;
             if (debounce != null) debounce.Stop();
             if (!HomeNav.SigningIn) { Load(game); Preload(null); }
         }
@@ -163,6 +166,7 @@ namespace Selene
                 Application.Current.Dispatcher.BeginInvoke(new Action(() =>
                 {
                     loading.Remove(id);
+                    if (suspended) return;
                     if (generation != downloadGeneration)
                     {
                         var selectedNow = AsGame(pending);
@@ -193,6 +197,35 @@ namespace Selene
             // Release our decoded references; no forced collection or deletion of downloaded files.
             cache.Clear(); recent.Clear();
             if (shown != Guid.Empty && current.Count > 0) Remember(shown, current);
+        }
+
+        public static void SuspendForMinimize()
+        {
+            suspended = true;
+            if (debounce != null) debounce.Stop();
+            downloadGeneration++;
+            loading.Clear();
+            if (viewer != null) CloseViewer(false);
+            cache.Clear(); recent.Clear();
+            shown = Guid.Empty;
+            current = new List<ShotItem>();
+            HideLoading(false);
+            var resources = Application.Current != null ? Application.Current.Resources : null;
+            if (resources == null) return;
+            for (int i = 0; i < Tiles; i++)
+            {
+                resources["SeleneShot" + i] = null;
+                resources["SeleneShot" + i + "Vis"] = Visibility.Collapsed;
+            }
+            resources["SeleneShotsNone"] = Visibility.Collapsed;
+        }
+
+        public static void ResumeAfterMinimize()
+        {
+            if (!suspended) return;
+            suspended = false;
+            var selected = AsGame(pending);
+            if (selected != null && !HomeNav.SigningIn) Load(selected);
         }
 
         // ---- background download of every game's screenshots (one game at a time, from Playnite start) ----
@@ -618,12 +651,14 @@ namespace Selene
             viewerCount.Text = viewerItems.Count > 1 ? (viewerIndex + 1) + " / " + viewerItems.Count : "";
         }
 
-        private static void CloseViewer()
+        private static void CloseViewer(bool restoreFocus = true)
         {
             var p = viewer != null ? viewer.Parent as Panel : null;
             if (p != null) p.Children.Remove(viewer);
             viewer = null; viewerImage = null; viewerItems = null;
-            if (returnFocus != null) returnFocus.Focus();
+            var focus = returnFocus;
+            returnFocus = null;
+            if (restoreFocus && focus != null) focus.Focus();
         }
 
         // the outermost panel that fills the window, so the viewer covers the whole screen

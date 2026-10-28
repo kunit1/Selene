@@ -88,9 +88,18 @@ namespace Selene
         // decodes a wallpaper on a background thread, then calls ready on the UI thread (at once when it's decoded already), so
         // Show is instant: decoding on the UI thread stalled the profile steps' glides. Only the latest request calls back.
         private static int prepareGeneration;
+        private static int cacheGeneration;
+
+        public static void ReleasePreloaded()
+        {
+            cacheGeneration++;
+            recent.Clear();
+        }
+
         public static void Prepare(string file, Action ready)
         {
             int mine = ++prepareGeneration;
+            int cacheVersion = cacheGeneration;
             if (string.IsNullOrEmpty(file) || Cached(file) != null) { ready(); return; }
             var ui = System.Windows.Application.Current.Dispatcher;
             System.Threading.Tasks.Task.Factory.StartNew(() =>
@@ -98,7 +107,7 @@ namespace Selene
                 var pic = Load(file);   // frozen: safe to hand to the UI thread
                 ui.BeginInvoke(new Action(() =>
                 {
-                    Remember(file, pic);
+                    if (cacheVersion == cacheGeneration) Remember(file, pic);
                     if (mine == prepareGeneration) ready();
                 }));
             });
