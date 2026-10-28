@@ -516,6 +516,24 @@ namespace Selene
         private static System.Windows.Threading.DispatcherTimer tierTimer;
         private static int softwareSeconds;
         private static bool restarting;
+        private static bool paused;
+
+        public static void Pause()
+        {
+            if (paused) return;
+            paused = true;
+            System.Windows.Media.CompositionTarget.Rendering -= OnFrame;
+            if (tierTimer != null) tierTimer.Stop();
+        }
+
+        public static void Resume()
+        {
+            if (!paused) return;
+            paused = false;
+            lastFrame = 0; frames = 0; sum = 0;
+            System.Windows.Media.CompositionTarget.Rendering += OnFrame;
+            if (tierTimer != null) tierTimer.Start();
+        }
 
         public static void Start()
         {

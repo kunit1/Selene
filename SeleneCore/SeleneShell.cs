@@ -68,6 +68,7 @@ namespace Selene
             var library = HomeNav.FindByName(main, "SeleneNav_library") as ButtonBase;
             var hub = HomeNav.FindByName(main, "SeleneNav_hub") as ButtonBase;
             if (library == null || hub == null) return false;
+            MinimizeOptimizer.Install(main);
             library.Command = new Relay(ShowLibrary);
             LoginScene.AttachHomeGlow(main);   // the login's glow behind the home's cards
             LibraryStage.Attach(main);         // Collection's background trailer

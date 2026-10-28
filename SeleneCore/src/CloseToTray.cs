@@ -33,6 +33,7 @@ namespace Selene
         {
             var w = Application.Current.MainWindow;
             if (w == null) return;
+            MinimizeOptimizer.Install(w);
             NoTransitions(w);
             w.SourceInitialized += (s, e) => NoTransitions(w);
             // Alt+F4 / title-bar X / taskbar Close arrive as SC_CLOSE; Playnite's own Closing handler starts its shutdown
@@ -195,11 +196,13 @@ namespace Selene
                 { try { other.Close(); HomeNav.Log("tray: closed " + other.GetType().FullName + " before hiding"); } catch { } }
             EnsureTray();
             tray.Visible = true;
+            MinimizeOptimizer.Install(w);
             NoTransitions(w);
             // start hidden-black, so coming back fades in (no flash of the old frame)
             var root = w.Content as UIElement;
             if (root != null) { root.BeginAnimation(UIElement.OpacityProperty, null); root.Opacity = 0; root.Opacity = 1; root.BeginAnimation(UIElement.OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(0, TimeSpan.Zero)); }
             cameFromTray = true;
+            MinimizeOptimizer.Suspend(w);
             w.Hide();
             SetOwnAudioMute(true);
             HomeNav.Log("tray: Playnite hidden to the tray (muted)");
@@ -236,6 +239,8 @@ namespace Selene
                 var w = Application.Current.MainWindow;
                 if (w != null) HomeNav.FadeInRoot(w.Content as UIElement);
             }
+            var win = Application.Current.MainWindow;
+            if (win != null) MinimizeOptimizer.Resume(win);
             SetOwnAudioMute(false);
             if (Features.On("startrefresh")) HomeNav.RefreshLibrary("shown");
             if (tray != null) tray.Visible = false;

@@ -499,8 +499,7 @@ namespace Selene
 
         internal static void CancelGlide(TranslateTransform shift)
         {
-            if (shift == null || shift != glideShift) return;
-            shift.X = glideRest;
+            if (shift != null && shift == glideShift) shift.X = glideRest;
             StopGlide();
         }
 

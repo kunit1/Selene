@@ -670,6 +670,26 @@ namespace Selene
 
         private static readonly List<OffThread> dusts = new List<OffThread>();
 
+        public static void PauseVisuals(bool pause)
+        {
+            try
+            {
+                foreach (var pair in backdrops)
+                {
+                    if (pair.Key != null)
+                    {
+                        if (pause) pair.Key.Pause();
+                        else if (pair.Key.IsVisible && videoAllowed) pair.Key.Play();
+                    }
+                }
+                foreach (var d in dusts)
+                {
+                    if (d != null) d.Visibility = pause ? Visibility.Collapsed : Visibility.Visible;
+                }
+            }
+            catch { }
+        }
+
         private static Canvas Dust(Size size, Color accent, Color inkColor)
         {
             var c = new Canvas { IsHitTestVisible = false };

@@ -7,7 +7,8 @@ $core = Join-Path $root 'SeleneCore'
 $out = Join-Path $core 'bin'
 $stage = Join-Path $core 'obj\stage'  # Playnite keeps bin\SeleneCore.dll open while running
 $fw = 'C:\Windows\Microsoft.NET\Framework64\v4.0.30319'
-$sdk = Join-Path $env:LOCALAPPDATA 'Playnite\Playnite.SDK.dll'
+$sdk = 'D:\Projects\Playnite\Playnite\Playnite.SDK.dll'
+if (-not (Test-Path $sdk)) { $sdk = Join-Path $env:LOCALAPPDATA 'Playnite\Playnite.SDK.dll' }
 
 New-Item -ItemType Directory -Force $out, $stage | Out-Null
 $sources = @(Get-ChildItem $core -Filter *.cs) + @(Get-ChildItem (Join-Path $core 'src') -Filter *.cs) | ForEach-Object { $_.FullName }
