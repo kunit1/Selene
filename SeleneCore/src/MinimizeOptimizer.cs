@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Media;
 
 namespace Selene
@@ -11,8 +12,8 @@ namespace Selene
     // Preserves the GPU/VRAM suspension and additionally releases reclaimable image/cache memory when Playnite is minimized or hidden.
     // 1. Shuts down active video decoders (LibraryStage trailers, tile previews, backdrop videos) to release DXVA GPU engines and buffers.
     // 2. Unhooks render loops (CompositionTarget.Rendering, full refresh rate, glide clocks, smoothness monitors).
-    // 3. Collects and clears all active BitmapCache surfaces across the visual tree to free Direct3D textures from VRAM.
-    // 4. Sets root visual to Hidden, causing WPF's milcore composition engine to enter complete idle state.
+    // 3. Detaches active BitmapCache modes; WPF or the driver may retain their VRAM allocations while its device remains alive.
+    // 4. Hides the root visual to stop presenting application content while keeping the tree available for quick restore.
     // 5. Releases decoded screenshot, launch-art and wallpaper-preview cache references before collecting unreachable images.
     // 6. Asks Windows to trim resident pages; committed/private bytes can remain allocated until reused or released by their owners.
     // 7. Restores caches, refresh rates, and visuals on window restore.
@@ -32,6 +33,9 @@ namespace Selene
         private static readonly List<CachedNode> savedCaches = new List<CachedNode>();
         private static Visibility savedRootVisibility = Visibility.Visible;
         private static UIElement savedRoot;
+        private static object savedContent;
+        private static BindingBase savedContentBinding;
+        private static bool contentDetached;
 
         public static bool IsMinimized { get { return isMinimized; } }
 
@@ -96,7 +100,7 @@ namespace Selene
                 Smoothness.Pause();
                 Ui.FullRateChanged();
 
-                // 3. Clear all BitmapCache instances from the visual tree to free VRAM textures
+                // 3. Detach BitmapCache modes; WPF or the driver may retain the underlying allocations for reuse.
                 savedCaches.Clear();
                 CollectAndClearCaches(window);
                 if (Application.Current != null)
@@ -109,9 +113,9 @@ namespace Selene
                         }
                     }
                 }
-                HomeNav.Log("gpu-opt: cleared " + savedCaches.Count + " BitmapCache textures from VRAM");
+                HomeNav.Log("gpu-opt: detached " + savedCaches.Count + " BitmapCache modes");
 
-                // 4. Hide root content to halt milcore composition passes completely
+                // 4. Disconnect the root from WPF's presentation tree but retain its state for restoration.
                 var root = window != null ? window.Content as UIElement : null;
                 if (root != null)
                 {
@@ -119,19 +123,18 @@ namespace Selene
                     savedRootVisibility = root.Visibility;
                     root.Visibility = Visibility.Hidden;
                 }
+                savedContent = window.Content;
+                savedContentBinding = BindingOperations.GetBindingBase(window, ContentControl.ContentProperty);
+                if (savedContentBinding != null) BindingOperations.ClearBinding(window, ContentControl.ContentProperty);
+                window.Content = null;
+                contentDetached = true;
 
-                // 5. Collect image objects released above, then ask Windows to trim reclaimable resident pages.
-                GC.Collect(2, GCCollectionMode.Forced, true);
-                GC.WaitForPendingFinalizers();
-                GC.Collect(2, GCCollectionMode.Forced, true);
-
-                try
-                {
-                    EmptyWorkingSet(Process.GetCurrentProcess().Handle);
-                }
-                catch { }
-
-                HomeNav.Log("gpu-opt: suspension complete (rendering paused, image caches released, working set trimmed)");
+                var trimTimer = new System.Windows.Threading.DispatcherTimer(
+                    System.Windows.Threading.DispatcherPriority.ApplicationIdle, window.Dispatcher)
+                { Interval = TimeSpan.FromMilliseconds(350) };
+                trimTimer.Tick += (s, e) => { trimTimer.Stop(); TrimMemoryAfterDetach(); };
+                trimTimer.Start();
+                HomeNav.Log("gpu-opt: visual tree detached; post-decoder memory trim queued");
             }
             catch (Exception ex)
             {
@@ -147,12 +150,20 @@ namespace Selene
 
             try
             {
-                // 1. Restore root visibility
+                // 1. Restore root state and reconnect the content/binding.
                 if (savedRoot != null)
                 {
                     savedRoot.Visibility = savedRootVisibility == Visibility.Visible ? Visibility.Visible : savedRootVisibility;
-                    savedRoot = null;
                 }
+                if (contentDetached && window != null)
+                {
+                    if (savedContentBinding != null) BindingOperations.SetBinding(window, ContentControl.ContentProperty, savedContentBinding);
+                    else window.Content = savedContent;
+                    contentDetached = false;
+                    savedContent = null;
+                    savedContentBinding = null;
+                }
+                savedRoot = null;
 
                 // 2. Restore BitmapCaches
                 int restoredCount = 0;
@@ -199,7 +210,7 @@ namespace Selene
                 var el = current as UIElement;
                 if (el != null && el.CacheMode != null)
                 {
-                    savedCaches.Add(new CachedNode { Target = new WeakReference(el), Mode = el.CacheMode });
+                    savedCaches.Add(new CachedNode { Target = new WeakReference(el), Mode = el.CacheMode.CloneCurrentValue() });
                     el.CacheMode = null;
                 }
 
@@ -210,6 +221,20 @@ namespace Selene
                     if (child != null) queue.Enqueue(child);
                 }
             }
+        }
+
+        private static void TrimMemoryAfterDetach()
+        {
+            if (!isMinimized) return;
+            try
+            {
+                GC.Collect(2, GCCollectionMode.Forced, true);
+                GC.WaitForPendingFinalizers();
+                GC.Collect(2, GCCollectionMode.Forced, true);
+                EmptyWorkingSet(Process.GetCurrentProcess().Handle);
+                HomeNav.Log("gpu-opt: detached visual tree; reclaimable memory trim complete");
+            }
+            catch (Exception ex) { HomeNav.Log("gpu-opt: memory trim failed: " + ex.Message); }
         }
     }
 }

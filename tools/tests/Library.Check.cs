@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -201,6 +202,16 @@ class LibraryCheck
             var item=list.ItemContainerGenerator.ContainerFromIndex(list.SelectedIndex>=0?list.SelectedIndex:1) as DependencyObject;
             Assert(item!=null && Child<Grid>(item).CacheMode is BitmapCache,"Real cover template caches the focus face and ring");
             Features.Set("collectionglide",false);LibraryStage.ApplyNavigationSettings();Assert((bool)panel.GetValue(smooth),"Turning off Selene glide restores the native setting");
+            library.CacheMode=new BitmapCache();
+            var contentSource=new ContentControl{Content=library};
+            BindingOperations.SetBinding(window,ContentControl.ContentProperty,new Binding("Content"){Source=contentSource});
+            app.MainWindow=window;
+            MinimizeOptimizer.Suspend(window);
+            Assert(window.Content==null && MinimizeOptimizer.IsMinimized,"Minimize disconnects the visual tree from WPF presentation");
+            Wait(50);
+            MinimizeOptimizer.Resume(window);
+            Assert(ReferenceEquals(window.Content,library) && BindingOperations.IsDataBound(window,ContentControl.ContentProperty),"Restore reattaches the same content and binding");
+            Assert(library.CacheMode is BitmapCache && !MinimizeOptimizer.IsMinimized,"Restore reinstates cached visuals and clears minimized state");
             Console.WriteLine("Passed "+checks+" real Playnite panel checks. Layout passes for one move: "+before+" native animated, "+after+" with Selene logical step.");return 0;
         }
         finally{window.Close();}

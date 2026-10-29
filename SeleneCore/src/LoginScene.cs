@@ -584,6 +584,7 @@ namespace Selene
         // looping video (theme\Media\selene-background.mp4); other themes get the drawn version in their color (a light
         // beam, haze, drifting dust). Either only on themes without a wallpaper (RefreshBackdrop / RefreshHomeGlow).
         private static readonly List<KeyValuePair<MediaElement, Grid>> backdrops = new List<KeyValuePair<MediaElement, Grid>>();
+        private static readonly Dictionary<MediaElement, Uri> suspendedBackdropSources = new Dictionary<MediaElement, Uri>();
 
         // the background video starts with the logo intro, so the intro and the screens after it share one background (the
         // logo draws on its own thread, IntroLogo, so decoding the video no longer makes it stutter)
@@ -688,17 +689,35 @@ namespace Selene
         {
             try
             {
+                if (pause) suspendedBackdropSources.Clear();
                 foreach (var pair in backdrops)
                 {
                     if (pair.Key != null)
                     {
-                        if (pause) pair.Key.Pause();
-                        else if (pair.Key.IsVisible && videoAllowed) pair.Key.Play();
+                        if (pause)
+                        {
+                            if (pair.Key.Source != null) suspendedBackdropSources[pair.Key] = pair.Key.Source;
+                            pair.Key.BeginAnimation(UIElement.OpacityProperty, null);
+                            pair.Key.Opacity = 0;
+                            pair.Key.Stop();
+                            pair.Key.Source = null;
+                            pair.Key.Visibility = Visibility.Collapsed;
+                        }
+                        else
+                        {
+                            Uri source;
+                            if (suspendedBackdropSources.TryGetValue(pair.Key, out source)) pair.Key.Source = source;
+                        }
                     }
                 }
                 foreach (var d in dusts)
-                {
                     if (d != null) d.Visibility = pause ? Visibility.Collapsed : Visibility.Visible;
+                if (!pause)
+                {
+                    suspendedBackdropSources.Clear();
+                    ShowBackdropKind();
+                    foreach (var pair in backdrops)
+                        if (pair.Key != null && pair.Key.IsVisible && videoAllowed) pair.Key.Play();
                 }
             }
             catch { }
