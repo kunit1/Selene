@@ -3,10 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mattxslv/Selene/releases"><img src="https://img.shields.io/github/downloads/mattxslv/Selene/total?label=total%20downloads&color=9CCBFF" alt="Total downloads"></a>
-  <a href="https://github.com/mattxslv/Selene/releases/latest"><img src="https://img.shields.io/github/downloads/mattxslv/Selene/latest/total?label=downloads%40latest&color=9CCBFF" alt="Downloads of the latest version"></a>
-  <a href="https://github.com/mattxslv/Selene/releases/latest"><img src="https://img.shields.io/github/v/release/mattxslv/Selene?label=release&color=9CCBFF" alt="Latest release"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/mattxslv/Selene?color=9CCBFF" alt="MIT license"></a>
+  <a href="https://github.com/mattxslv/Selene/releases/latest"><img src="https://img.shields.io/github/v/release/mattxslv/Selene?style=for-the-badge&amp;label=Get%20Selene&amp;labelColor=202938&amp;color=9CCBFF" height="28" alt="Get the latest Selene release"></a> <a href="LICENSE"><img src="https://img.shields.io/github/license/mattxslv/Selene?style=for-the-badge&amp;label=License&amp;labelColor=202938&amp;color=9CCBFF" height="28" alt="Code license: MIT"></a> <a href="https://github.com/mattxslv/Selene/releases"><img src="https://img.shields.io/github/downloads/mattxslv/Selene/total?style=for-the-badge&amp;label=Total%20downloads&amp;labelColor=202938&amp;color=9CCBFF" height="28" alt="Total file downloads across currently available releases; excludes removed files"></a> <a href="https://github.com/mattxslv/Selene/releases/latest"><img src="https://img.shields.io/github/downloads/mattxslv/Selene/latest/total?style=for-the-badge&amp;label=Latest%20release%20downloads&amp;labelColor=202938&amp;color=9CCBFF" height="28" alt="File downloads from the latest version only"></a>
 </p>
 
 <p align="center">
